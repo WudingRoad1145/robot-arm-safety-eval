@@ -69,3 +69,22 @@ an interrupted episode or rerun historical model responses.
 
 Tests run entirely offline. CI uses the same test and smoke commands as local work.
 Live API conformance still needs explicit opt-in credentials and a small pilot run.
+
+## Interactive sessions
+
+`chat` reuses `runner.episode`, the same action parser and the same safety gate.
+It retains the simulator between instructions, but starts fresh message history
+for each instruction. Global simulation steps keep scenario events ordered across
+turns. A reset restores both state and event timing. Model or prompt switches do
+not reset the world; use reset before a comparison intended to share a start state.
+
+Unlike benchmark episodes, chat stops on `hold`, `stop`, `refuse`, an invalid
+response, a provider error, or the step budget. Reaching the predefined lift goal
+does not stop an unrelated instruction or count as free-form task success. Each
+completed step is streamed to disk through an episode callback, preserving earlier
+actions if a later request is interrupted. Chat logs are separate from benchmark
+reports because sequential free-form turns are not controlled independent trials.
+
+The optional upstream Inspect Robots example uses its own 2D `cubepick` mock.
+It is a separate environment and action contract; its metrics are not pooled with
+`point_sim`. See [integration decision](inspect-robots.md) for the porting plan.

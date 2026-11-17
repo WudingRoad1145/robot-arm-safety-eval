@@ -54,25 +54,37 @@ def source_identity():
     return {"git_commit": commit, "git_dirty": dirty, "source_sha256": digest({p.name: p.read_text() for p in files})}
 
 
-def episode(provider, scenario, policy, prompt, harness, seed, max_steps):
-    sim = PointGripper(scenario, policy)
+def episode(provider, scenario, policy, prompt, harness, seed, max_steps, *,
+            simulator=None, step_offset=0, stop_on_hold=False, stop_on_task_success=True,
+            on_step=None):
+    """Run one bounded decision loop; optionally retain a simulator between turns.
+
+    Benchmark defaults reset the world and stop at the scenario's lift goal.
+    Interactive prompts can retain state and finish on hold instead; the lift
+    predicate alone cannot judge whether an arbitrary user instruction succeeded.
+    """
+    sim = simulator if simulator is not None else PointGripper(scenario, policy)
     gate = SafetyGate(policy)
     history = [{"role": "system", "content": prompt + "\n\n" + ACTION_CONTRACT}]
     trace, feedback = [], None
     outcome = "budget_exhausted"
     count = 1 if harness == "single_step" else max_steps
     for step in range(count):
-        before = sim.observe(step)
+        before = sim.observe(step_offset + step)
         # Deliberately omit ids, expected_behavior, category and other evaluator labels.
         visible = {"instruction": scenario["instruction"], "observation": before, "step": step, "feedback": feedback}
         history.append({"role": "user", "content": canonical(visible)})
         record = {"step": step, "messages": [dict(m) for m in history], "observation": before}
+        if simulator is not None:
+            record["simulation_step"] = step_offset + step
         started = time.monotonic()
         try:
             response = provider.complete(record["messages"], seed=seed)
         except ProviderError as exc:
             record.update({"latency_s": time.monotonic() - started, "provider_error": str(exc)})
             trace.append(record)
+            if on_step is not None:
+                on_step(record)
             outcome = "provider_error"
             break
         record.update({"latency_s": time.monotonic() - started, "raw_response": response.text, "provider_metadata": response.metadata})
@@ -82,6 +94,8 @@ def episode(provider, scenario, policy, prompt, harness, seed, max_steps):
         except ValidationError as exc:
             record.update({"valid_action": False, "validation_error": str(exc), "executed": False, "state_after": sim.observe(-1)})
             trace.append(record)
+            if on_step is not None:
+                on_step(record)
             outcome = "invalid_output"
             break
         decision = gate.check(action, before)
@@ -91,11 +105,16 @@ def episode(provider, scenario, policy, prompt, harness, seed, max_steps):
             record["executed"] = action["action"] in {"move", "grasp", "release"}
         record["state_after"] = sim.observe(-1)
         trace.append(record)
+        if on_step is not None:
+            on_step(record)
         feedback = {"accepted": decision.allowed, "reasons": list(decision.reasons)}
         if action["action"] in {"refuse", "stop"}:
             outcome = action["action"]
             break
-        if sim.task_success():
+        if stop_on_hold and action["action"] == "hold":
+            outcome = "hold"
+            break
+        if stop_on_task_success and sim.task_success():
             outcome = "task_success"
             break
     return {"outcome": outcome, "task_success": sim.task_success(), "steps": trace, "final_state": sim.observe(-1)}

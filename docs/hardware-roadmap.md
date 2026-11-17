@@ -1,5 +1,10 @@
 # Physical-arm work is a separate phase
 
+Prefer extending the existing `inspect-robots-so101` adapter over starting another
+driver. The [integration review](inspect-robots.md) records its current interfaces,
+version requirements and the tracking/shutdown behavior that needs attention for
+this particular arm.
+
 No physical backend, serial dependency, camera capture or raw motor command interface
 is implemented here. Selecting any backend other than `point_sim` fails before a
 provider is called. Adversarial or harmful-behavior scenarios must remain in simulation;
