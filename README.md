@@ -4,11 +4,8 @@ A model-agnostic foundation for studying unsafe robot-action proposals, prompt
 robustness, and runtime safety intervention. Swap models, prompt files, scenarios,
 and evaluation harnesses through JSON configs; compare the resulting traces.
 
-**This version cannot operate a physical arm.** It uses a deterministic abstract
-point-gripper simulator. It is not an SO-ARM101 digital twin and does not validate
-real-world safety, camera alignment, grasp force, or collision-free arm motion.
-The live arm scripts and camera images from the preceding experiment are deliberately
-not imported. Adversarial cases belong in simulation.
+Current backend: `point_sim` (simulation). See the [Inspect Robots integration](integrations/inspect_robots/README.md)
+and [SO-ARM101 integration plan](docs/inspect-robots.md) for the next layer.
 
 ## Run in one minute
 
@@ -41,6 +38,60 @@ python3 -m robot_eval report runs/YOUR_RUN_DIRECTORY
 Run from this repository root. Alternatively, `python3 -m pip install -e .` installs
 the `robot-eval` command; pass an absolute `--config` path when running elsewhere.
 Editable installation requires setuptools; the direct module commands need only Python.
+
+## Enter a prompt in the terminal
+
+Start an interactive session with a real model:
+
+```bash
+export OPENAI_MODEL='your-exact-model-id'
+# Hidden input; the key does not become a literal shell-history entry.
+export OPENAI_API_KEY="$(python3 -c 'import getpass; print(getpass.getpass("OpenAI API key: "))')"
+python3 -m robot_eval chat --config configs/openai.json --allow-network
+```
+
+At the `point_sim>` prompt, try `Decrease x by 20 mm, then hold.` or
+`Pick up the block and lift it to z=80 mm, then hold.` The terminal prints each
+proposal, gate decision, and resulting simulated position. It keeps world state
+between prompts; `/reset` restores the initial scene. Each new instruction starts
+a fresh model conversation with the current state.
+
+```text
+/status
+/models
+/model MODEL_ID
+/prompts
+/prompt cautious
+/reset
+/quit
+```
+
+`/model` selects an **id from the config**, not an arbitrary provider model name.
+For two OpenAI models, set `MODEL_A` and `MODEL_B` to their exact API model names,
+then use `--config configs/chat-models.json`; switch with `/model model_a` or
+`/model model_b`. Both use `OPENAI_API_KEY`. `/prompt` changes the configured system
+prompt; ordinary text is the task instruction. Use `--scenario ID` to select the
+initial scene. The default scene is the first one in the config.
+
+For an offline walkthrough:
+
+```bash
+python3 -m robot_eval chat --config configs/smoke.json
+```
+
+The mock fixtures follow scripted behavior and **do not understand your text**.
+Use an API model for instruction following. The interactive loop is capped at
+20 model calls per instruction and 100 instructions per session, or the config's
+smaller budget. `/help` lists commands. Ctrl-C ends the session and retains completed
+steps. API requests can incur charges; `--allow-network` is required even for localhost.
+
+Chat artifacts are saved under `runs/chat-*/`, with exact step traces and selection
+events. Free-form instructions have no automatic success judge; the scenario's lift
+goal is recorded only as a diagnostic. Use `run` for controlled model comparisons,
+where every trial starts from the same initial state.
+
+For multi-provider tool-calling experiments through the upstream harness, follow
+the [optional Inspect Robots quickstart](integrations/inspect_robots/README.md).
 
 ## Switch models
 
@@ -125,10 +176,13 @@ No aggregate score should be presented as a real-world safety certification.
 | `robot_eval/safety.py` | Strict JSON actions and independent deterministic gate |
 | `robot_eval/simulation.py` | Abstract point-gripper transitions |
 | `robot_eval/runner.py` | Matrices, harnesses, traces, metrics and reports |
+| `robot_eval/interactive.py` | Stateful terminal prompts, model selection and chat traces |
+| `integrations/inspect_robots/` | Pinned optional upstream harness and offline smoke example |
 | `prompts/`, `scenarios/`, `configs/` | Versioned experiment inputs |
 | `tests/` | Offline provider, safety, config and runner regressions |
 | `docs/architecture.md` | Trust boundaries, extension contracts and limitations |
 | `docs/hardware-roadmap.md` | Requirements before any separate benign hardware validation |
+| `docs/inspect-robots.md` | LEASH/RoboHarm comparison and SO-101 adapter findings |
 
 Run outputs, keys and camera imagery are git-ignored. Treat custom inputs and raw
 outputs as potentially sensitive; inspect before sharing artifacts.

@@ -1,0 +1,4 @@
+# Optional integration only. The dependency-free robot_eval core does not use these.
+# Both upstream packages are pinned to the same reviewed source revision.
+inspect-robots @ git+https://github.com/robocurve/inspect-robots.git@772019598e42ccc7921a043dee3a2ea2692020ea
+inspect-robots-agent @ git+https://github.com/robocurve/inspect-robots.git@772019598e42ccc7921a043dee3a2ea2692020ea#subdirectory=plugins/inspect-robots-agent
