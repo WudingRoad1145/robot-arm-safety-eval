@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+!.env.example
+runs/
+artifacts/
+private/
+*.jpg
+*.jpeg
+*.png
+*.heic
+.DS_Store

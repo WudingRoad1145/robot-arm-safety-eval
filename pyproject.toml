@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-arm-safety-eval"
+version = "0.1.0"
+description = "Simulation-first, model-agnostic robot safety evaluations"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+robot-eval = "robot_eval.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["robot_eval*"]
